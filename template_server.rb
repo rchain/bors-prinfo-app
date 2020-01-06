@@ -62,6 +62,21 @@ class GHAapp < Sinatra::Application
     # ADD YOUR CODE HERE  #
     # # # # # # # # # # # #
 
+    if @payload['action'] == 'created' and @payload['check_run']['name'] == 'Build Base' then
+      reply = @installation_client.commit(@payload['repository']['id'], @payload['check_run']['head_sha'])
+      commit = reply['commit']
+      puts commit
+      if commit['author']['name'] == 'bors[bot]' and commit['message'] =~ /^(Merge|Try) (.*)/ then
+        pr_numbers = $2.split().map { |s| s[1..].to_i }
+        pr_numbers.each { |n|
+          message = "NOTICE: Bors has merged this PR into a commit (" \
+            + @payload['check_run']['head_sha'][0..8] + ' ' + commit['message'].lines.first.chomp \
+            + ") that triggered new check suite: " + @payload['check_run']['html_url']
+          @installation_client.add_comment(@payload['repository']['id'], n, message)
+        }
+      end
+    end
+
     200 # success status
   end
 
